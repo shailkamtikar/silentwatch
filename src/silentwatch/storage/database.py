@@ -66,7 +66,7 @@ class Database:
     # -- opening / recovery -------------------------------------------------
     def _connect(self) -> sqlite3.Connection:
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        conn = sqlite3.connect(str(self.path), check_same_thread=False, timeout=10)
+        conn = sqlite3.connect(str(self.path), check_same_thread=False, timeout=2)
         try:
             conn.execute("PRAGMA journal_mode=WAL")
             conn.execute("PRAGMA synchronous=NORMAL")

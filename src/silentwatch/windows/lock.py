@@ -60,20 +60,24 @@ class WindowsLockService:
                 return LockResult(False, self.dry_run, True, None, reason)
             self._last_request = now
 
-            self._log(EventType.LOCK_REQUESTED, Severity.CRITICAL, reason, {"dry_run": self.dry_run})
             if self.dry_run:
+                self._log(EventType.LOCK_REQUESTED, Severity.CRITICAL, reason, {"dry_run": True})
                 log.warning("DRY RUN: would lock Windows (%s)", reason)
                 self._log(EventType.LOCK_RESULT, Severity.INFO, reason, {"dry_run": True}, "dry_run")
                 return LockResult(True, True, False, None, reason)
 
+            # The real lock is requested BEFORE anything touches the database, so a slow, locked or full
+            # database can never delay or prevent it.
             try:
                 ok, err = self._lock_fn()
             except Exception as exc:  # noqa: BLE001 - lock failure must never crash monitoring
                 log.error("LockWorkStation raised %r", exc)
+                self._log(EventType.LOCK_REQUESTED, Severity.CRITICAL, reason, {"dry_run": False})
                 self._log(EventType.LOCK_RESULT, Severity.CRITICAL, reason, {"exception": repr(exc)}, "failed")
                 return LockResult(False, False, False, None, reason)
             if not ok:
                 log.error("LockWorkStation failed, error=%s", err)
+            self._log(EventType.LOCK_REQUESTED, Severity.CRITICAL, reason, {"dry_run": False})
             self._log(
                 EventType.LOCK_RESULT,
                 Severity.INFO if ok else Severity.CRITICAL,

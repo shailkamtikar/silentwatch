@@ -27,3 +27,17 @@ Camera failures never produce tamper locks by themselves; the capture service re
 
 ## Feature extractor real-data note (M3.1, T3.1-09)
 See decision D8 in `docs/decisions.md`: first real-camera feature values were recorded. Covered-lens and lights-off values still need to be recorded by a human (see `docs/manual-verification.md`).
+
+## Failure-mode and security results (M9.1, automated)
+
+| Check | Result |
+|---|---|
+| Hard-kill a process mid-write, reopen | `PRAGMA integrity_check` = ok, data kept (test) |
+| Database held locked by another connection | Real lock fires within 2 s; decisions continue; events queue in memory and are written later (tests) |
+| Corrupted calibration row | Logged, recalibrated automatically, no crash (test) |
+| Calibration refused while lens covered | Retried until uncovered, then detection works (test) |
+| Transient processing error | Monitoring continues (test); 20 in a row surface as an error state |
+| Storage full | Decisions and locks unaffected (test) |
+| 60 randomised hostile settings files + garbage/oversized files | Never raised; safety floors hold; defaults used (tests) |
+| Network | No socket/HTTP imports in the product (test); live headless run: 0 TCP connections, 0 UDP endpoints |
+| Privilege | Ran non-elevated (`IsUserAnAdmin` = False); no elevation APIs in source (test) |
