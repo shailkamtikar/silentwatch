@@ -27,3 +27,15 @@ Decided in M7.1 (see below once recorded).
 
 ## D7. Real-camera capture measurement (M2.1)
 On the HP camera via DSHOW at 640x480: first emitted frame ~2.3 s after start (15 warm-up frames discarded), ~4.6 frames/s emitted at the 5 fps analysis rate, five start/stop cycles all succeeded and released the device. The first emitted frame still had mean luma ~6 (very dark), so exposure may need more than 15 frames to settle; calibration (M3.2) therefore also waits for brightness to stabilise instead of trusting a fixed frame count.
+
+## D8. Real-camera feature sanity values and low-light behaviour (M3.1)
+Measured with `python -m silentwatch.tools.feature_probe` on the HP camera in the evening room at the time of testing (numbers only, nothing saved):
+
+| Condition | mean luma | dark ratio | std | tile flat | edge density | structure ratio |
+|---|---|---|---|---|---|---|
+| Real scene, dim room with one lit object | 5.9 | 0.97 | 36 | 0.75 | 0.018 | 0.54 |
+
+Findings:
+- In a dim room the camera uses long auto-exposure and delivers only ~4 unique frames/s (15 unique frames in 120 reads at ~30 Hz). Consecutive reads are often bit-identical. Frozen detection therefore works on the emitted (5 fps) stream with a 10-frame threshold, never on raw reads.
+- A realistic baseline can be very dark (mean ~6) yet still structured. Calibration must not reject dark-but-structured baselines; it rejects only baselines that are already featureless (covered lens).
+- Darkness alone is not a feature the classifier trusts; structure collapse (std, edge density, tile flatness, structure ratio) is.

@@ -24,3 +24,6 @@ Items that need a human at the laptop (physical lock, covering the lens, walking
 | Disable/enable camera in Device Manager (admin) | Needs manual run: expect recovery within ~35 s | PENDING |
 
 Camera failures never produce tamper locks by themselves; the capture service retries with 1,2,4,...,30 s backoff and reports UNAVAILABLE/FROZEN/RECOVERED events.
+
+## Feature extractor real-data note (M3.1, T3.1-09)
+See decision D8 in `docs/decisions.md`: first real-camera feature values were recorded. Covered-lens and lights-off values still need to be recorded by a human (see `docs/manual-verification.md`).
