@@ -1,0 +1,56 @@
+# SILENTWATCH default configuration. Single source of truth for all thresholds.
+# User overrides live in %APPDATA%\SilentWatch\settings.json (same section/key names).
+
+[camera]
+backend = "dshow"          # dshow | msmf
+index = 0
+width = 640
+height = 480
+analysis_fps = 5.0         # frames analysed per second
+warmup_frames = 15         # frames discarded after opening (auto-exposure warm-up)
+frozen_frames = 10         # identical frames before FROZEN
+read_fail_limit = 5        # consecutive failed reads before UNAVAILABLE
+max_backoff_s = 30.0       # reconnect backoff cap
+queue_size = 8
+
+[obstruction]
+confirm_debounce_s = 1.0   # obstruction must persist this long (balanced)
+strict_debounce_s = 0.5    # same, strict mode
+min_debounce_s = 0.2       # safety floor: a single frame can never lock
+clear_frames = 5           # normal frames needed to clear an obstruction
+calibration_seconds = 5.0
+calibration_stale_days = 30
+
+[presence]
+enabled = true
+present_detections = 3     # consecutive detections to become present
+pending_s = 3.0            # without a face before absence is pending
+lock_after_s = 10.0        # confirmed absence before lock
+min_confidence = 0.5
+
+[policy]
+mode = "balanced"          # strict | balanced
+dry_run = true             # never really lock while true (development default)
+lock_cooldown_s = 5.0
+post_unlock_grace_s = 10.0
+signal_expiry_s = 30.0
+
+[privacy]
+snapshots = false          # evidence snapshots are opt-in
+retention_days = 30        # event log retention
+snapshot_retention_days = 7
+consent_given = false
+
+[hand]
+enabled = true
+approach_growth = 0.35     # relative bbox-area growth per 0.5 s that counts as approaching
+
+[bluetooth]
+enabled = false
+missing_after_s = 60.0
+
+[usb]
+enabled = false
+
+[logging]
+level = "INFO"
