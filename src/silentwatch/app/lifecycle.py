@@ -92,6 +92,10 @@ class SilentWatchService:
         self._preview_on = False
         self._preview: object | None = None
         self._lock_mutex = threading.Lock()
+        self._event_q: queue.Queue[str] = queue.Queue()
+        self._force_locked_until = 0.0
+        self._suspended = False
+        self._last_wall = time.time()
 
     # -- lifecycle ------------------------------------------------------------------------
     def start(self) -> None:
@@ -233,8 +237,33 @@ class SilentWatchService:
                 return f
         return None
 
+    def on_session_event(self, kind: str) -> None:
+        """Thread-safe entry for SessionWatcher events: LOCK, UNLOCK, LOGOFF, SUSPEND, RESUME ..."""
+        self._event_q.put(kind)
+
+    def _handle_events(self) -> None:
+        while True:
+            try:
+                kind = self._event_q.get_nowait()
+            except queue.Empty:
+                break
+            if kind in ("LOCK", "LOGOFF", "REMOTE_DISCONNECT"):
+                self._force_locked_until = self.clock() + 2.0     # polling confirms or clears this within seconds
+            elif kind == "UNLOCK":
+                self._force_locked_until = 0.0
+            elif kind == "SUSPEND":
+                self._suspended = True
+            elif kind == "RESUME":
+                self._suspended = False
+        # fallback if a RESUME notification was missed: a big wall-clock jump means the laptop slept
+        wall = time.time()
+        if wall - self._last_wall > 15.0:
+            self._suspended = False
+        self._last_wall = wall
+
     def _poll_session(self) -> None:
-        locked = self._session_locked()
+        self._handle_events()
+        locked = self._session_locked() or self.clock() < self._force_locked_until or self._suspended
         if locked == self._locked:
             return
         self._locked = locked

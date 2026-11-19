@@ -80,6 +80,7 @@ class TrayApp:
         open_dashboard: Callable[[], None] | None = None,
         on_quit: Callable[[], None] | None = None,
         open_settings: Callable[[], None] | None = None,
+        startup: tuple[Callable[[], bool], Callable[[bool], None]] | None = None,
     ):
         from PySide6.QtCore import QTimer
         from PySide6.QtGui import QAction, QActionGroup
@@ -111,10 +112,18 @@ class TrayApp:
             mode_menu.addAction(a)
             self.mode_actions[name] = a
 
+        self.act_startup = None
+        if startup is not None:
+            is_on, set_on = startup
+            self.act_startup = QAction("Start with Windows", checkable=True)
+            self.act_startup.setChecked(is_on())
+            self.act_startup.toggled.connect(set_on)
         self.act_quit = QAction("Quit SILENTWATCH")
         self.act_quit.triggered.connect(self.quit)
         for a in (self.act_dashboard, self.act_pause, self.act_calibrate, self.act_settings):
             self.menu.insertAction(mode_menu.menuAction(), a)
+        if self.act_startup is not None:
+            self.menu.addAction(self.act_startup)
         self.menu.addSeparator()
         self.menu.addAction(self.act_quit)
         self.tray.setContextMenu(self.menu)

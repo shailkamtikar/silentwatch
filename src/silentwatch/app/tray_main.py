@@ -90,7 +90,15 @@ def run_tray(args: argparse.Namespace) -> int:
         dash["settings"] = dlg
         dlg.show()
 
-    tray = TrayApp(svc, open_dashboard=open_dashboard, on_quit=quit_app, open_settings=open_settings)
+    from silentwatch.app import startup
+    from silentwatch.windows.session_watcher import SessionWatcher
+
+    watcher = SessionWatcher(svc.on_session_event)
+    watcher.start()
+    tray = TrayApp(
+        svc, open_dashboard=open_dashboard, on_quit=lambda: (watcher.stop(), quit_app()), open_settings=open_settings,
+        startup=(startup.is_enabled, lambda on: startup.enable() if on else startup.disable()),
+    )
     if not QSystemTrayIcon.isSystemTrayAvailable():
         logging.warning("no system tray available on this desktop")
     svc.start()
