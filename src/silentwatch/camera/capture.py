@@ -55,6 +55,8 @@ class CameraCaptureService:
         queue_size: int = 8,
         frozen_frames: int = 10,
         read_fail_limit: int = 5,
+        frozen_seconds: float = 20.0,
+        frozen_reopen_interval_s: float = 300.0,
         backoff_factory: Callable[[], Backoff] = Backoff,
         on_status: StatusCallback | None = None,
         retry_on_open_failure: bool = True,
@@ -67,6 +69,9 @@ class CameraCaptureService:
         self._stop = threading.Event()
         self._frozen_frames = frozen_frames
         self._fail_limit = read_fail_limit
+        self._frozen_seconds = frozen_seconds
+        self._frozen_reopen_interval = frozen_reopen_interval_s
+        self._last_frozen_reopen: float | None = None
         self._backoff = backoff_factory()
         self._on_status = on_status
         self._retry = retry_on_open_failure
@@ -169,7 +174,7 @@ class CameraCaptureService:
 
     def _read_loop(self, source: FrameSource, was_lost: bool) -> bool:
         """Returns True if stopped by request, False if the camera needs reconnecting."""
-        monitor = CameraHealthMonitor(self._frozen_frames, self._fail_limit, self._interval)
+        monitor = CameraHealthMonitor(self._frozen_frames, self._fail_limit, self._interval, self._frozen_seconds)
         self.state = CaptureState.RUNNING
         index = read_count = 0
         next_emit = 0.0
@@ -200,8 +205,11 @@ class CameraCaptureService:
             self.health_state = monitor.state
             for e in events:
                 self._notify(e.kind.value, e.detail)
-            if monitor.state == HealthState.FROZEN:
-                return False  # re-open the device; a frozen driver often needs it
+            if monitor.state == HealthState.FROZEN and any(e.kind == HealthEventKind.FROZEN for e in events):
+                # Re-opening costs seconds of blind time, so it is rate-limited; otherwise just warn.
+                if self._last_frozen_reopen is None or now - self._last_frozen_reopen >= self._frozen_reopen_interval:
+                    self._last_frozen_reopen = now
+                    return False
             self._publish(Frame(img, now, index))
             index += 1
         return True

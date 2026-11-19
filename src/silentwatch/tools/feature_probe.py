@@ -21,7 +21,7 @@ def main(argv: list[str] | None = None) -> int:
     cfg = load_config().camera
     svc = CameraCaptureService(
         lambda: CvFrameSource(cfg.index, cfg.width, cfg.height, cfg.backend),
-        cfg.analysis_fps, cfg.warmup_frames, cfg.queue_size, cfg.frozen_frames, cfg.read_fail_limit,
+        cfg.analysis_fps, cfg.warmup_frames, cfg.queue_size, cfg.frozen_frames, cfg.read_fail_limit, cfg.frozen_seconds, cfg.frozen_reopen_interval_s,
     )
     ex = FeatureExtractor()
     end = time.monotonic() + args.seconds

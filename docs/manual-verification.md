@@ -11,3 +11,4 @@ Automated tests never call the real `LockWorkStation`, never cover your lens and
 | M2.3 | T2.3-03 | Device Manager: disable then enable the camera while a run is active; recovery within ~35 s | PENDING |
 | M2.3 | T2.3-04..07 | Windows Camera app / Meet / Hello / privacy toggle matrix in `docs/testing.md` | PENDING |
 | M3.1 | T3.1-09 | Run `python -m silentwatch.tools.feature_probe --seconds 10` three times: normal, hand covering lens, lights off; paste the numbers into `docs/testing.md` | PENDING |
+| M3.2 | T3.2-07 | Calibrate in your normal desk lighting with the screen on: `python -m silentwatch.tools.calibrate`. (An automated run in the dim test room already succeeded with 22 frames.) | PARTIAL |
