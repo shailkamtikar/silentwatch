@@ -92,7 +92,9 @@ class ObstructionClassifier:
         edge = f.edge_density / base_edge
         bright = f.mean_luma / base_mean
         flat_gain = f.tile_flat_ratio - base_flat
-        struct_lost = f.structure_ratio < max(self.t.structure_floor, 0.4 * base_struct)
+        # With under ~2 gray levels of total contrast the structure ratio is just quantisation noise, so it is
+        # not trusted: such an image is featureless by definition.
+        struct_lost = f.std_luma < 2.0 or f.structure_ratio < max(self.t.structure_floor, 0.4 * base_struct)
         scores = {
             "contrast_ratio": round(contrast, 3),
             "edge_ratio": round(edge, 3),
