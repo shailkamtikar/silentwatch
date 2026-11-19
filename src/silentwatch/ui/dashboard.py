@@ -54,6 +54,7 @@ def make_dashboard(service: SilentWatchService):
             self.lbl_obstruction = QLabel()
             self.lbl_presence = QLabel()
             self.lbl_countdown = QLabel()
+            self.lbl_hand = QLabel()
             self.bar = QProgressBar()
             self.bar.setRange(0, 100)
             self.bar.setFormat("Scene structure lost: %p%")
@@ -84,7 +85,7 @@ def make_dashboard(service: SilentWatchService):
 
             top = QVBoxLayout()
             top.addWidget(self.banner)
-            for w in (self.lbl_obstruction, self.lbl_presence, self.lbl_countdown, self.bar, self.chk_preview, self.preview):
+            for w in (self.lbl_obstruction, self.lbl_presence, self.lbl_countdown, self.lbl_hand, self.bar, self.chk_preview, self.preview):
                 top.addWidget(w)
             row = QHBoxLayout()
             row.addWidget(self.cmb_filter)
@@ -119,6 +120,7 @@ def make_dashboard(service: SilentWatchService):
             self.lbl_countdown.setText(
                 f"Locking in {s.lock_in_s:.0f}s unless someone returns" if s.lock_in_s is not None else "No lock pending"
             )
+            self.lbl_hand.setText(f"Hand near camera: {s.hand_score * 100:.0f}% (early warning only)")
             self.bar.setValue(structure_loss_percent(s.scores))
             return s
 

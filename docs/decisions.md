@@ -54,3 +54,9 @@ Early scripted tests showed that, with cooldown 0, a persisting condition (e.g. 
 
 ## D13. Live end-to-end dry run (M4.4)
 `python -m silentwatch --headless --seconds 30` on the HP camera (dry-run, temporary data dir): started, calibrated automatically (MISSING -> 6 frames wait -> baseline), then with nobody in view went `OWNER_ABSENT_PENDING` at ~9 s after start and issued a dry-run lock for "owner absent beyond configured timeout" at ~19 s after start, i.e. 10 s after the last (non-)detection as configured. A static dim scene produced a FROZEN warning after ~18 s of identical frames and one device re-open; defaults were raised to `frozen_seconds = 60` and `frozen_reopen_interval_s = 600` to make that rarer. All 8 scripted end-to-end scenarios (A, C, D, E, F, post-unlock, clean exit, audit trail) pass with fake camera/face/lock.
+
+## D14. Hand-approach evidence (M6.1)
+`hand_landmarker.task` (Google model storage, 7,819,105 bytes, SHA-256 pinned). On a blank 640x480 frame it costs ~8.5 ms (CPU), so it is only run when stage 1 flags a change (M6.2). The score combines relative bounding-box growth over 0.5 s with absolute size; it is monotone and clipped to 0..1. It is early-warning evidence only: policy never locks on it alone.
+
+## D15. Two-stage pipeline cost (M6.2)
+Live on the HP camera (idle dim room, dry-run, face + obstruction analysis at 5 fps, 20 s window after calibration): process CPU 7.0 % of one core without the hand model and 6.2 % with it enabled; 89 frames analysed in both runs and **0** hand-model invocations, because stage 1 saw no change. (The difference is measurement noise.) Stage 2 wakes on `frame_diff >= 4`, a non-NORMAL obstruction state, or for 2 s after a hand was last seen. A hand signal alone only notifies; with a possible/partial obstruction it locks before the plain debounce expires. A failing hand model disables itself and monitoring continues on stage 1.

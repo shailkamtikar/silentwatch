@@ -42,6 +42,15 @@ def run_headless(args: argparse.Namespace) -> int:
         except ModelMissingError as exc:
             print(f"presence disabled: {exc}", file=sys.stderr)
 
+    hands = None
+    if cfg.hand.enabled:
+        try:
+            from silentwatch.camera.hand_detector import HandModelMissingError, MediaPipeHandBackend
+
+            hands = MediaPipeHandBackend()
+        except HandModelMissingError as exc:
+            logging.warning("hand detection disabled: %s", exc)
+
     db = Database(app_data_dir() / "silentwatch.db")
     c = cfg.camera
     svc = SilentWatchService(
@@ -51,6 +60,7 @@ def run_headless(args: argparse.Namespace) -> int:
         backend,
         WindowsLockService(None, dry_run=policy.dry_run, cooldown_s=policy.lock_cooldown_s),
         on_status_line=lambda s: print(f"[{time.strftime('%H:%M:%S')}] {s}", flush=True),
+        hand_backend=hands,
     )
     svc.lock_service.store = svc.store
     print(f"SILENTWATCH {__version__} headless | mode={policy.mode} | {'LIVE (real lock)' if args.live else 'DRY-RUN (no real lock)'} | Ctrl+C to stop")

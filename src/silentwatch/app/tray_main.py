@@ -50,11 +50,21 @@ def run_tray(args: argparse.Namespace) -> int:
         except ModelMissingError as exc:
             logging.warning("presence disabled: %s", exc)
 
+    hands = None
+    if cfg.hand.enabled:
+        try:
+            from silentwatch.camera.hand_detector import HandModelMissingError, MediaPipeHandBackend
+
+            hands = MediaPipeHandBackend()
+        except HandModelMissingError as exc:
+            logging.warning("hand detection disabled: %s", exc)
+
     db = Database(app_data_dir() / "silentwatch.db")
     c = cfg.camera
     svc = SilentWatchService(
         cfg, db, lambda: CvFrameSource(c.index, c.width, c.height, c.backend), backend,
         WindowsLockService(None, dry_run=policy.dry_run, cooldown_s=policy.lock_cooldown_s),
+        hand_backend=hands,
     )
     svc.lock_service.store = svc.store
 

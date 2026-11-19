@@ -21,6 +21,7 @@ from silentwatch.camera.calibration import (
 from silentwatch.camera.capture import CameraCaptureService
 from silentwatch.camera.events import log_camera_status
 from silentwatch.camera.frame import Frame, FrameSource
+from silentwatch.camera.hand_detector import HandApproachTracker, HandBackend
 from silentwatch.camera.integrity import FeatureExtractor
 from silentwatch.camera.obstruction import ObstructionClassifier, ObstructionState, log_obstruction
 from silentwatch.config.models import Config
@@ -45,6 +46,7 @@ class ServiceStatus:
     crashed: bool = False
     scores: dict | None = None
     seconds_since_seen: float = 0.0
+    hand_score: float = 0.0
     lock_in_s: float | None = None      # seconds until an absence lock, when absence is pending
 
 
@@ -60,6 +62,7 @@ class SilentWatchService:
         session_locked_fn: Callable[[], bool] = is_workstation_locked,
         camera_id: str = "camera0",
         on_status_line: Callable[[str], None] | None = None,
+        hand_backend: HandBackend | None = None,
     ):
         self.cfg = cfg
         self.db = db
@@ -85,6 +88,11 @@ class SilentWatchService:
         self._t0 = clock()
         self._last_obs = "UNKNOWN"
         self.lock_actions: list[Action] = []   # every LOCK decision (for tests and diagnostics)
+        self.hand = hand_backend if cfg.hand.enabled else None
+        self.hand_tracker = HandApproachTracker(cfg.hand.approach_growth)
+        self.hand_invocations = 0
+        self.hand_score = 0.0
+        self._hand_active_until = 0.0
         self._paused = False
         self._recalibrate = False
         self.crashed = False
@@ -120,7 +128,7 @@ class SilentWatchService:
         pending = tr.state.value in ("OWNER_ABSENT_PENDING", "PRESENCE_UNCERTAIN") and since > 0
         return ServiceStatus(
             self.core.state, self.classifier.state, tr.state.value, cam, self._frames, self._frames / elapsed,
-            self._paused, self.crashed, self._last_scores, since, max(0.0, tr.lock_after_s - since) if pending else None,
+            self._paused, self.crashed, self._last_scores, since, self.hand_score, max(0.0, tr.lock_after_s - since) if pending else None,
         )
 
     # -- controls used by the tray / dashboard -------------------------------------------------
@@ -296,9 +304,33 @@ class SilentWatchService:
         if self._preview_on:
             self._preview = frame.image.copy()
         self._dispatch(self.core.on_obstruction(result))
+        self._stage2(frame, feats, result)
         if self.estimator is not None:
             obs = self.estimator.observe(frame.image)
             self._dispatch(self.core.on_presence(obs, frame.monotonic_ts))
+
+    STAGE2_FRAME_DIFF = 4.0   # mean gray change that wakes the (more expensive) hand model
+
+    def _stage2(self, frame: Frame, feats, result) -> None:
+        """Run the hand model only when stage 1 saw a change or a hand was recently active (Book section 15)."""
+        if self.hand is None:
+            return
+        ts = frame.monotonic_ts
+        if not (feats.frame_diff >= self.STAGE2_FRAME_DIFF or result.state != ObstructionState.NORMAL or ts < self._hand_active_until):
+            self.hand_score = 0.0
+            return
+        try:
+            boxes = self.hand.detect(frame.image)
+        except Exception:  # noqa: BLE001 - optional evidence must never break monitoring
+            log.exception("hand detector failed; disabling it")
+            self.hand = None
+            return
+        self.hand_invocations += 1
+        score = self.hand_tracker.update(boxes, ts)
+        self.hand_score = score.score
+        if boxes:
+            self._hand_active_until = ts + 2.0
+        self._dispatch(self.core.on_hand(self.hand_tracker.approaching(score), score.score))
 
     # -- actions ------------------------------------------------------------------------------------
     def _dispatch(self, actions: list[Action]) -> None:
