@@ -26,3 +26,4 @@ Automated tests never call the real `LockWorkStation`, never cover your lens and
 | M6.1 | T6.1-01..04 | Move your hand toward the lens: hand score rises; away: falls; no hand: ~0; dim light: no crash | PENDING |
 | M6.2 | T6.2-05 | Live `--live`: move your hand quickly toward the lens and cover it: lock happens, event log shows both the hand and obstruction evidence | PENDING |
 | M7.1 | T7.1-03..05,07 | Screen-off / pocket / Battery-Saver / 20-minute address-rotation checks with the phone (run `python scripts/ble_scan.py`); install an advertiser app on the phone and confirm its UUID is seen | PENDING |
+| M7.2 | T7.2-02..06 | After enrolling (`python -m silentwatch.tools.enroll_phone ...`): phone beside laptop = PRESENT; phone in another room for the configured window = MISSING; Bluetooth toggled off = BT_UNAVAILABLE (not MISSING); laptop sleep/wake recovers (matrix in Book 18.3) | PENDING |
