@@ -90,6 +90,8 @@ class SilentWatchService:
         self._last_obs = "UNKNOWN"
         self.lock_actions: list[Action] = []   # every LOCK decision (for tests and diagnostics)
         self.hand = hand_backend if cfg.hand.enabled else None
+        self.evidence = None                       # optional EvidenceStore (snapshots are opt-in)
+        self._last_normal = None
         self.usb = None                            # optional UsbMonitor, set by the caller
         self._usb_q: queue.Queue = queue.Queue()
         self.proximity = None                      # optional BluetoothProximityService, set by the caller
@@ -350,11 +352,28 @@ class SilentWatchService:
             self._last_scores = result.scores
         if self._preview_on:
             self._preview = frame.image.copy()
+        self._capture_evidence(frame, result)
         self._dispatch(self.core.on_obstruction(result))
         self._stage2(frame, feats, result)
         if self.estimator is not None:
             obs = self.estimator.observe(frame.image)
             self._dispatch(self.core.on_presence(obs, frame.monotonic_ts))
+
+    def _capture_evidence(self, frame: Frame, result) -> None:
+        """Only runs when snapshots are enabled. Keeps ONE pre-obstruction frame in memory, nothing else."""
+        if self.evidence is None:
+            return
+        try:
+            if result.state == ObstructionState.NORMAL:
+                self._last_normal = frame.image.copy()
+            elif result.changed and result.state == ObstructionState.CONFIRMED_OBSTRUCTION:
+                if self._last_normal is not None:
+                    p = self.evidence.save(self._last_normal, "last_frame_before_obstruction")
+                    self.store.append(EventType.SNAPSHOT_SAVED, source="evidence", details={"file": p.name, "label": "last frame before obstruction"})
+                p = self.evidence.save(frame.image, "first_obstructed_frame")
+                self.store.append(EventType.SNAPSHOT_SAVED, source="evidence", details={"file": p.name, "label": "first obstructed frame"})
+        except Exception:  # noqa: BLE001 - optional evidence must never break monitoring
+            log.exception("evidence capture failed")
 
     STAGE2_FRAME_DIFF = 4.0   # mean gray change that wakes the (more expensive) hand model
 

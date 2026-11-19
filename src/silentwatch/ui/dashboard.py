@@ -80,6 +80,10 @@ def make_dashboard(service: SilentWatchService):
             self.table.setSelectionMode(QTableView.SelectionMode.SingleSelection)
             self.table.horizontalHeader().setStretchLastSection(True)
             self.table.clicked.connect(self._show_why)
+            self.btn_snapshot = QPushButton("View snapshot")
+            self.btn_snapshot.setEnabled(False)
+            self.btn_snapshot.clicked.connect(self._view_snapshot)
+            self._selected_event = None
             self.why = QTextEdit()
             self.why.setReadOnly(True)
             self.why.setPlaceholderText("Select an event to see why it happened.")
@@ -95,6 +99,7 @@ def make_dashboard(service: SilentWatchService):
             bottom.addLayout(row)
             bottom.addWidget(self.lbl_empty)
             bottom.addWidget(self.table)
+            bottom.addWidget(self.btn_snapshot)
             bottom.addWidget(self.why)
             top_w, bottom_w = QWidget(), QWidget()
             top_w.setLayout(top)
@@ -138,7 +143,30 @@ def make_dashboard(service: SilentWatchService):
 
         def _show_why(self, index) -> None:
             if 0 <= index.row() < len(self.history.rows):
-                self.why.setPlainText(why_text(self.history.rows[index.row()]))
+                ev = self.history.rows[index.row()]
+                self._selected_event = ev
+                self.why.setPlainText(why_text(ev))
+                has_file = bool(ev.details and ev.details.get("file")) and self.service.evidence is not None
+                self.btn_snapshot.setEnabled(has_file)
+
+        def _view_snapshot(self) -> None:
+            from PySide6.QtWidgets import QDialog, QMessageBox
+
+            ev, store = self._selected_event, self.service.evidence
+            if ev is None or store is None:
+                return
+            try:
+                img = store.load(store.dir / ev.details["file"])
+            except Exception as exc:  # noqa: BLE001
+                QMessageBox.warning(self, "Snapshot", f"Could not open snapshot: {exc}")
+                return
+            dlg = QDialog(self)
+            dlg.setWindowTitle(f"Snapshot - {ev.details.get('label', '')} (not necessarily the person who covered the lens)")
+            lbl = QLabel()
+            lbl.setPixmap(QPixmap.fromImage(numpy_to_qimage(img)).scaledToWidth(640))
+            lay = QVBoxLayout(dlg)
+            lay.addWidget(lbl)
+            dlg.exec()
 
         def _toggle_preview(self, on: bool) -> None:
             self.service.set_preview(on)
