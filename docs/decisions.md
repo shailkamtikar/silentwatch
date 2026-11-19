@@ -45,3 +45,6 @@ First version flagged `FROZEN` after 10 identical emitted frames (2 s) and re-op
 
 ## D10. Calibration accepts static streams (M3.2)
 The playbook asked calibration to reject frozen streams. On the real camera a still, dim room produced bit-identical frames for the whole 5 s window, so a "frozen" check rejected a perfectly healthy camera. Calibration now rejects only too few frames and covered/featureless scenes. A real run on the HP camera saved a baseline from 22 frames (mean luma 5.9).
+
+## D11. Presence via MediaPipe Face Detector (M4.2)
+`mediapipe 1.2.3` with `blaze_face_short_range.tflite` (Google model storage, 229,746 bytes, SHA-256 pinned in `scripts/download_models.ps1` and `models/README.md`; recorded on first verified download). Detection costs ~2.5 ms per frame on this laptop's CPU. A corrupted model file is detected by hash and re-downloaded (tested). A live run in the dim test room saw 0 faces in 45 frames and correctly progressed to `OWNER_ABSENT_PENDING`; detection of a real face needs a person in view (see `docs/manual-verification.md`). Presence is not identity: a photo can be detected as a face (documented limit).
