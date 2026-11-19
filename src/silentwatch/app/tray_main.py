@@ -67,6 +67,15 @@ def run_tray(args: argparse.Namespace) -> int:
         hand_backend=hands,
     )
     svc.lock_service.store = svc.store
+    if cfg.privacy.snapshots:
+        from silentwatch.storage.evidence import EvidenceStore
+
+        svc.evidence = EvidenceStore(app_data_dir() / "evidence", cfg.privacy.snapshot_retention_days)
+        svc.evidence.purge()
+    if cfg.usb.enabled:
+        from silentwatch.windows.usb_monitor import UsbMonitor
+
+        svc.usb = UsbMonitor(svc.on_usb_event)
     if cfg.bluetooth.enabled:
         from silentwatch.bluetooth.enrollment import EnrollmentStore, make_source
         from silentwatch.bluetooth.proximity import BluetoothProximityService, ProximitySmoother

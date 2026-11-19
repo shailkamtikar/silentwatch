@@ -158,6 +158,8 @@ class PolicyEngine:
             return [Action(ActionKind.NOTIFY, "camera unavailable while you are present", "camera_unavailable_present")]
         if k == K.HAND_APPROACHING:
             return [Action(ActionKind.NOTIFY, "hand approaching the camera (early warning only)", "hand_alone")]
+        if k == K.USB_STORAGE_ARRIVED and not (K.OWNER_ABSENT_PENDING in self._levels or K.OWNER_ABSENT_CONFIRMED in self._levels):
+            return [Action(ActionKind.LOG, "USB storage connected (owner present; logged only)", "usb_logged")]
         if k == K.LOW_BRIGHTNESS:
             return [Action(ActionKind.LOG, "low brightness alone never locks", "low_brightness")]
         if k == K.PHONE_MISSING:
