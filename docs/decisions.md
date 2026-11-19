@@ -24,3 +24,6 @@ DSHOW is the default. **Finding:** the first frame after opening is nearly black
 
 ## D6. Phone proximity method
 Decided in M7.1 (see below once recorded).
+
+## D7. Real-camera capture measurement (M2.1)
+On the HP camera via DSHOW at 640x480: first emitted frame ~2.3 s after start (15 warm-up frames discarded), ~4.6 frames/s emitted at the 5 fps analysis rate, five start/stop cycles all succeeded and released the device. The first emitted frame still had mean luma ~6 (very dark), so exposure may need more than 15 frames to settle; calibration (M3.2) therefore also waits for brightness to stabilise instead of trusting a fixed frame count.
