@@ -41,6 +41,11 @@ class ServiceStatus:
     camera: str
     frames: int
     fps: float
+    paused: bool = False
+    crashed: bool = False
+    scores: dict | None = None
+    seconds_since_seen: float = 0.0
+    lock_in_s: float | None = None      # seconds until an absence lock, when absence is pending
 
 
 class SilentWatchService:
@@ -80,6 +85,13 @@ class SilentWatchService:
         self._t0 = clock()
         self._last_obs = "UNKNOWN"
         self.lock_actions: list[Action] = []   # every LOCK decision (for tests and diagnostics)
+        self._paused = False
+        self._recalibrate = False
+        self.crashed = False
+        self._last_scores: dict | None = None
+        self._preview_on = False
+        self._preview: object | None = None
+        self._lock_mutex = threading.Lock()
 
     # -- lifecycle ------------------------------------------------------------------------
     def start(self) -> None:
@@ -99,7 +111,40 @@ class SilentWatchService:
     def status(self) -> ServiceStatus:
         cam = self._capture.state.value if self._capture else "STOPPED"
         elapsed = max(1e-6, self.clock() - self._t0)
-        return ServiceStatus(self.core.state, self.classifier.state, self.core.tracker.state.value, cam, self._frames, self._frames / elapsed)
+        tr = self.core.tracker
+        since = tr.seconds_since_seen(self.clock())
+        pending = tr.state.value in ("OWNER_ABSENT_PENDING", "PRESENCE_UNCERTAIN") and since > 0
+        return ServiceStatus(
+            self.core.state, self.classifier.state, tr.state.value, cam, self._frames, self._frames / elapsed,
+            self._paused, self.crashed, self._last_scores, since, max(0.0, tr.lock_after_s - since) if pending else None,
+        )
+
+    # -- controls used by the tray / dashboard -------------------------------------------------
+    def pause(self) -> None:
+        """Stop monitoring and release the camera. No decisions (and no locks) happen while paused."""
+        self._paused = True
+        self.store.append(EventType.SETTINGS_CHANGED, source="service", details={"paused": True})
+
+    def resume(self) -> None:
+        self._paused = False
+        self.store.append(EventType.SETTINGS_CHANGED, source="service", details={"paused": False})
+
+    def set_mode(self, mode: str) -> None:
+        self.core.set_mode(mode)
+        self.classifier.mode = mode
+        self.store.append(EventType.SETTINGS_CHANGED, source="service", details={"mode": mode})
+
+    def request_calibration(self) -> None:
+        self._recalibrate = True
+
+    def set_preview(self, enabled: bool) -> None:
+        self._preview_on = enabled
+        if not enabled:
+            self._preview = None
+
+    def latest_preview(self):
+        """A copy of the latest frame, only while the preview is enabled (otherwise None; nothing is kept)."""
+        return self._preview
 
     # -- camera handling --------------------------------------------------------------------
     def _make_capture(self) -> CameraCaptureService:
@@ -108,6 +153,12 @@ class SilentWatchService:
             self._factory, c.analysis_fps, c.warmup_frames, c.queue_size, c.frozen_frames, c.read_fail_limit,
             c.frozen_seconds, c.frozen_reopen_interval_s, on_status=lambda k, d: self._status_q.put((k, d)),
         )
+
+    def _resume_capture(self) -> None:
+        self.extractor.reset()
+        self._capture = self._make_capture()
+        self._capture.start()
+        self.core.engine.set_phase(None)
 
     def _release_camera(self) -> None:
         if self._capture is not None:
@@ -149,9 +200,20 @@ class SilentWatchService:
                 self._calibrate_if_needed(first)
             while not self._stop.is_set():
                 self._poll_session()
-                if self._locked:
+                if self._paused or self._locked:
+                    if self._paused and self._capture is not None:
+                        self._release_camera()          # camera LED off while paused
+                        self.core.engine.set_phase(State.DISABLED)
                     self._stop.wait(0.3)
                     continue
+                if self._capture is None:
+                    self._resume_capture()
+                if self._recalibrate and self._capture is not None:
+                    self._recalibrate = False
+                    f = self._wait_first_frame(10.0)
+                    if f is not None:
+                        self.calibration.clear()
+                        self._calibrate_if_needed(f)
                 self._drain_camera_status()
                 frame = self._capture.get(timeout=0.2) if self._capture else None
                 if frame is not None:
@@ -159,6 +221,7 @@ class SilentWatchService:
                 self._dispatch(self.core.tick())
         except Exception:  # noqa: BLE001 - the loop must not die silently
             log.exception("service loop crashed")
+            self.crashed = True
             self.store.append(EventType.ERROR, Severity.CRITICAL, "service", details={"detail": "service loop crashed"})
 
     def _wait_first_frame(self, timeout: float = 20.0) -> Frame | None:
@@ -182,9 +245,8 @@ class SilentWatchService:
         else:
             self._dispatch(self.core.on_session(False))
             self.store.append(EventType.SESSION_UNLOCKED, source="session")
-            self.extractor.reset()
-            self._capture = self._make_capture()
-            self._capture.start()
+            if not self._paused:
+                self._resume_capture()
 
     def _drain_camera_status(self) -> None:
         while True:
@@ -200,6 +262,10 @@ class SilentWatchService:
         feats = self.extractor.update(frame.image)
         result = self.classifier.update(feats, frame.monotonic_ts)
         log_obstruction(self.store, result)
+        if result.scores:
+            self._last_scores = result.scores
+        if self._preview_on:
+            self._preview = frame.image.copy()
         self._dispatch(self.core.on_obstruction(result))
         if self.estimator is not None:
             obs = self.estimator.observe(frame.image)

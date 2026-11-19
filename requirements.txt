@@ -1,2 +1,4 @@
 opencv-contrib-python
 mediapipe
+PySide6-Essentials
+pywin32

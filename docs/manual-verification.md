@@ -18,3 +18,5 @@ Automated tests never call the real `LockWorkStation`, never cover your lens and
 | M4.3 | live dry-run | `--dry-run`: stand up and leave the frame; log shows pending then `LOCK (dry-run)` at the configured time (full run in M4.4) | PENDING |
 | M4.4 | T4.4-01..05 | LIVE scenarios with the real lock: run `python -m silentwatch --headless --live` with work saved. A: walk away; C: cover lens with hand; D: lights off; E: sit and have someone cover the lens; F: disable camera in Device Manager. (Automated dry-run of the whole pipeline on the real camera already passed.) | PENDING |
 | M4.4 | T4.4-09 | 30-minute soak with `--headless` (dry-run): 0 false lock decisions, memory stable | PENDING |
+| M5.1 | T5.1-01..03,05 | Run `python -m silentwatch` (or `pythonw -m silentwatch`): tray icon appears with tooltip; Pause turns the camera LED off; Resume restores; Quit exits. (Automated: the tray launched and exited cleanly with the real camera in dry-run; icon logic and pause/resume are unit-tested.) | PARTIAL |
+| M5.1 | T5.1-08 | Confirm no UAC prompt appears when starting the app (nothing requests elevation) | PENDING |
