@@ -90,6 +90,8 @@ class SilentWatchService:
         self._last_obs = "UNKNOWN"
         self.lock_actions: list[Action] = []   # every LOCK decision (for tests and diagnostics)
         self.hand = hand_backend if cfg.hand.enabled else None
+        self.usb = None                            # optional UsbMonitor, set by the caller
+        self._usb_q: queue.Queue = queue.Queue()
         self.proximity = None                      # optional BluetoothProximityService, set by the caller
         self.phone_state = "OFF"
         self._phone_q: queue.Queue = queue.Queue()
@@ -117,11 +119,15 @@ class SilentWatchService:
         self._thread.start()
         if self.proximity is not None:
             self.proximity.start()
+        if self.usb is not None:
+            self.usb.start()
 
     def stop(self, timeout: float = 10.0) -> None:
         self._stop.set()
         if self.proximity is not None:
             self.proximity.stop()
+        if self.usb is not None:
+            self.usb.stop()
         if self._thread is not None:
             self._thread.join(timeout)
             self._thread = None
@@ -236,6 +242,7 @@ class SilentWatchService:
                         self._calibrate_if_needed(f)
                 self._drain_camera_status()
                 self._drain_phone()
+                self._drain_usb()
                 frame = self._capture.get(timeout=0.2) if self._capture else None
                 if frame is not None:
                     self._process(frame)
@@ -253,6 +260,24 @@ class SilentWatchService:
             if f is not None:
                 return f
         return None
+
+    def on_usb_event(self, kind: str) -> None:
+        """Thread-safe entry for UsbMonitor events ('ARRIVED' | 'REMOVED')."""
+        self._usb_q.put(kind)
+
+    def _drain_usb(self) -> None:
+        from silentwatch.policy import Signal, SignalKind
+
+        while True:
+            try:
+                kind = self._usb_q.get_nowait()
+            except queue.Empty:
+                return
+            if kind == "ARRIVED":
+                self.store.append(EventType.USB_STORAGE_ARRIVED, Severity.WARNING, "usb", details={"class": "usb_storage"})
+                self._dispatch(self.core.on_signal(Signal(SignalKind.USB_STORAGE_ARRIVED)))
+            else:
+                self.store.append(EventType.USB_STORAGE_REMOVED, Severity.INFO, "usb", details={"class": "usb_storage"})
 
     def on_phone_state(self, state) -> None:
         """Thread-safe entry for BluetoothProximityService state changes."""

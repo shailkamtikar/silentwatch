@@ -74,6 +74,12 @@ def _absent_pending_and_phone_missing(c: Context) -> str | None:
     return None
 
 
+def _usb_while_absent(c: Context) -> str | None:
+    if c.has(K.USB_STORAGE_ARRIVED) and c.owner_absent_any:
+        return "USB storage connected while owner absent"
+    return None
+
+
 def _camera_unavailable_and_absent(c: Context) -> str | None:
     if not c.has(K.CAMERA_UNAVAILABLE):
         return None
@@ -96,6 +102,7 @@ RULES: list[Rule] = [
     Rule("possible_and_absent_strict", _possible_and_absent_strict),
     Rule("hand_and_obstruction", _hand_and_obstruction),
     Rule("absent_pending_and_phone_missing", _absent_pending_and_phone_missing),
+    Rule("usb_while_absent", _usb_while_absent),
     Rule("camera_unavailable_and_absent", _camera_unavailable_and_absent),
     Rule("owner_absent_confirmed", _owner_absent_confirmed),
 ]
