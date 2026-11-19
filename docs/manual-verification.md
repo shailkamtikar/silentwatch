@@ -20,3 +20,4 @@ Automated tests never call the real `LockWorkStation`, never cover your lens and
 | M4.4 | T4.4-09 | 30-minute soak with `--headless` (dry-run): 0 false lock decisions, memory stable | PENDING |
 | M5.1 | T5.1-01..03,05 | Run `python -m silentwatch` (or `pythonw -m silentwatch`): tray icon appears with tooltip; Pause turns the camera LED off; Resume restores; Quit exits. (Automated: the tray launched and exited cleanly with the real camera in dry-run; icon logic and pause/resume are unit-tested.) | PARTIAL |
 | M5.1 | T5.1-08 | Confirm no UAC prompt appears when starting the app (nothing requests elevation) | PENDING |
+| M5.2 | T5.2-01 | Open the dashboard from the tray; enable the preview; wave a hand: image is smooth and the "scene structure lost" bar reacts. Take a screenshot for the demo (avoid showing private surroundings; do not commit it) | PENDING |

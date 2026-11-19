@@ -51,13 +51,26 @@ def run_tray(args: argparse.Namespace) -> int:
     )
     svc.lock_service.store = svc.store
 
+    dash: dict = {"w": None}
+
+    def open_dashboard() -> None:
+        from silentwatch.ui.dashboard import make_dashboard
+
+        if dash["w"] is None:
+            dash["w"] = make_dashboard(svc)
+        dash["w"].show()
+        dash["w"].raise_()
+        dash["w"].activateWindow()
+
     def quit_app() -> None:
+        if dash["w"] is not None:
+            dash["w"].close()
         svc.stop()
         db.close()
         guard.release()
         app.quit()
 
-    tray = TrayApp(svc, on_quit=quit_app)
+    tray = TrayApp(svc, open_dashboard=open_dashboard, on_quit=quit_app)
     if not QSystemTrayIcon.isSystemTrayAvailable():
         logging.warning("no system tray available on this desktop")
     svc.start()
