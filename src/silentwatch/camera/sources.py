@@ -100,3 +100,28 @@ class FakeFrameSource:
         self.released += 1
         self.opened = False
         self._it = None
+
+
+class CallableFrameSource:
+    """Pulls each frame from `fn()` (None = failed read). Lets tests change the 'scene' while running."""
+
+    def __init__(self, fn: Callable[[], np.ndarray | None], fps: float = 30.0, name: str = "callable"):
+        self.name = name
+        self._fn = fn
+        self._fps = fps
+        self.opened = False
+        self.released = 0
+
+    def open(self) -> bool:
+        self.opened = True
+        return True
+
+    def read(self) -> tuple[bool, np.ndarray | None]:
+        if self._fps > 0:
+            time.sleep(1.0 / self._fps)
+        img = self._fn()
+        return (img is not None), img
+
+    def release(self) -> None:
+        self.released += 1
+        self.opened = False

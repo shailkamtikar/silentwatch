@@ -45,3 +45,12 @@ First version flagged `FROZEN` after 10 identical emitted frames (2 s) and re-op
 
 ## D10. Calibration accepts static streams (M3.2)
 The playbook asked calibration to reject frozen streams. On the real camera a still, dim room produced bit-identical frames for the whole 5 s window, so a "frozen" check rejected a perfectly healthy camera. Calibration now rejects only too few frames and covered/featureless scenes. A real run on the HP camera saved a baseline from 22 frames (mean luma 5.9).
+
+## D11. Presence via MediaPipe Face Detector (M4.2)
+`mediapipe 1.2.3` with `blaze_face_short_range.tflite` (Google model storage, 229,746 bytes, SHA-256 pinned in `scripts/download_models.ps1` and `models/README.md`; recorded on first verified download). Detection costs ~2.5 ms per frame on this laptop's CPU. A corrupted model file is detected by hash and re-downloaded (tested). A live run in the dim test room saw 0 faces in 45 frames and correctly progressed to `OWNER_ABSENT_PENDING`; detection of a real face needs a person in view (see `docs/manual-verification.md`). Presence is not identity: a photo can be detected as a face (documented limit).
+
+## D12. Lock requests are latched per condition (M4.3)
+Early scripted tests showed that, with cooldown 0, a persisting condition (e.g. absence confirmed) issued a LOCK on every frame. The engine now latches: one LOCK per continuous condition; the latch re-arms when no rule triggers any more, on SESSION_UNLOCKED, or when `on_lock_result(False)` reports that Windows rejected the request (so a failed lock is retried).
+
+## D13. Live end-to-end dry run (M4.4)
+`python -m silentwatch --headless --seconds 30` on the HP camera (dry-run, temporary data dir): started, calibrated automatically (MISSING -> 6 frames wait -> baseline), then with nobody in view went `OWNER_ABSENT_PENDING` at ~9 s after start and issued a dry-run lock for "owner absent beyond configured timeout" at ~19 s after start, i.e. 10 s after the last (non-)detection as configured. A static dim scene produced a FROZEN warning after ~18 s of identical frames and one device re-open; defaults were raised to `frozen_seconds = 60` and `frozen_reopen_interval_s = 600` to make that rarer. All 8 scripted end-to-end scenarios (A, C, D, E, F, post-unlock, clean exit, audit trail) pass with fake camera/face/lock.
