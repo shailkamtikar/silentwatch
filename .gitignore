@@ -1,0 +1,41 @@
+# Environments
+.venv/
+.venv-spike/
+venv/
+__pycache__/
+*.pyc
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+
+# Secrets and local config
+.env
+.env.*
+settings.json
+
+# Local data (never commit camera data or databases)
+*.db
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite3
+*.corrupt
+data/
+evidence/
+
+# Models (downloaded by scripts/download_models.ps1)
+models/*.task
+models/*.tflite
+models/*.onnx
+
+# Build output
+dist/
+build/
+*.exe
+*.zip
+
+# Editors / OS
+.vscode/
+.idea/
+Thumbs.db
+.claude/
