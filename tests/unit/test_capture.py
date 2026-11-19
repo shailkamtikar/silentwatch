@@ -48,7 +48,7 @@ def test_open_failure_is_reported_not_raised():
     svc, _ = make(open_ok=False)
     svc.start()
     time.sleep(0.3)
-    assert svc.state == CaptureState.ERROR and "cannot open" in svc.error
+    assert svc.state == CaptureState.RETRYING  # retries forever with backoff, never raises
     svc.stop()
 
 
