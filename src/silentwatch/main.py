@@ -14,7 +14,7 @@ from silentwatch import __version__
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="silentwatch", description="SILENTWATCH laptop protection")
     p.add_argument("--version", action="store_true", help="print version and exit")
-    p.add_argument("--headless", action="store_true", help="run the monitoring service in the console")
+    p.add_argument("--headless", action="store_true", help="run the monitoring service in the console (default: system tray app)")
     p.add_argument("--live", action="store_true", help="REALLY lock Windows (default is dry-run: decisions are logged only)")
     p.add_argument("--mode", choices=["strict", "balanced"], help="override policy mode")
     p.add_argument("--no-presence", action="store_true", help="disable face presence detection")
@@ -76,5 +76,6 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     if args.headless:
         return run_headless(args)
-    print("Nothing to run. Use --headless (console) or --help.", file=sys.stderr)
-    return 0
+    from silentwatch.app.tray_main import run_tray
+
+    return run_tray(args)
