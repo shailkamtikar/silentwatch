@@ -63,6 +63,17 @@ def run_headless(args: argparse.Namespace) -> int:
         hand_backend=hands,
     )
     svc.lock_service.store = svc.store
+    if cfg.bluetooth.enabled:
+        from silentwatch.bluetooth.enrollment import EnrollmentStore, make_source
+        from silentwatch.bluetooth.proximity import BluetoothProximityService, ProximitySmoother
+
+        enrolled = EnrollmentStore(db).load()
+        if enrolled is None:
+            logging.warning("bluetooth.enabled is true but no phone is enrolled (python -m silentwatch.tools.enroll_phone)")
+        else:
+            svc.proximity = BluetoothProximityService(
+                make_source(enrolled), ProximitySmoother(cfg.bluetooth.missing_after_s), svc.on_phone_state, svc.store
+            )
     print(f"SILENTWATCH {__version__} headless | mode={policy.mode} | {'LIVE (real lock)' if args.live else 'DRY-RUN (no real lock)'} | Ctrl+C to stop")
     svc.start()
     try:

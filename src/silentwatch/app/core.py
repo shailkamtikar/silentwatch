@@ -55,6 +55,7 @@ class DecisionCore:
         self._last_obstruction_signal: K | None = None
         self.camera_ok = True
         self._hand_signalled = False
+        self._last_phone_signal: K | None = None
 
     def start_monitoring(self) -> list[Action]:
         return self.engine.set_phase(None)
@@ -84,6 +85,19 @@ class DecisionCore:
             return []
         self._last_obstruction_signal = sig
         return self.engine.handle(Signal(sig, detail={"reasons": result.reasons, "scores": result.scores}))
+
+    def on_phone(self, state) -> list[Action]:
+        from silentwatch.bluetooth.proximity import ProximityState
+
+        sig = {
+            ProximityState.PRESENT: K.PHONE_PRESENT,
+            ProximityState.MISSING: K.PHONE_MISSING,
+            ProximityState.UNAVAILABLE: K.BT_UNAVAILABLE,
+        }.get(state)
+        if sig is None or sig == self._last_phone_signal:
+            return []
+        self._last_phone_signal = sig
+        return self.engine.handle(Signal(sig))
 
     def on_hand(self, approaching: bool, score: float = 0.0) -> list[Action]:
         """Hand evidence. Only the transition into 'approaching' is forwarded (signals are not repeated per frame)."""
