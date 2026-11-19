@@ -6,7 +6,9 @@ $models = @(
   @{ Name = 'blaze_face_short_range.tflite'
      Url  = 'https://storage.googleapis.com/mediapipe-models/face_detector/blaze_face_short_range/float16/1/blaze_face_short_range.tflite'
      Sha256 = 'b4578f35940bf5a1a655214a1cce5cab13eba73c1297cd78e1a04c2380b0152f' }
-  # hand_landmarker.task is added in milestone 6.1 together with its pinned hash
+  @{ Name = 'hand_landmarker.task'
+     Url  = 'https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task'
+     Sha256 = 'fbc2a30080c3c557093b5ddfc334698132eb341044ccee322ccf8bcf3607cde1' }
 )
 $dir = Join-Path $PSScriptRoot '..\models'
 New-Item -ItemType Directory -Force $dir | Out-Null
