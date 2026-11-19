@@ -32,3 +32,6 @@ Automated tests never call the real `LockWorkStation`, never cover your lens and
 | M8.2 | T8.2-07 | Turn "Save evidence snapshots" on, trigger an obstruction, then sign in as a different Windows user and try to open `%APPDATA%\SilentWatch\evidence\*.swe` with the app: it must fail to decrypt | PENDING |
 | M9.1 | T9.1-02 | Reboot with "Start with Windows" on: app returns to the tray and monitoring resumes | PENDING |
 | M9.1 | T9.1-03,04 | Settings > Privacy & security > Camera: turn camera access off while running (expect CAMERA_UNAVAILABLE, no crash), turn on (recovers); disable/enable the camera in Device Manager (needs admin) | PENDING |
+| M9.2 | T9.2-02 | 30-minute `python scripts/measure.py --config baseline --seconds 1800`: RSS must stay flat (earlier 3-minute runs showed +2 to +6 MB) | PENDING |
+| M9.2 | T9.2-03 | Unplug the charger and run the same 30 minutes on battery, comparing the battery drop with SILENTWATCH off vs on | PENDING |
+| M9.2 | T9.2-05 | Run with a video call (Meet/Zoom) open: behaviour per the contention matrix in `docs/testing.md` | PENDING |
