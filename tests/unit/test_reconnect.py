@@ -100,7 +100,7 @@ def test_frozen_triggers_reopen():
 
     events = []
     svc = CameraCaptureService(
-        factory, 100, 0, 8, frozen_frames=5, backoff_factory=fast_backoff, on_status=lambda k, d: events.append(k)
+        factory, 100, 0, 8, frozen_frames=5, frozen_seconds=0, frozen_reopen_interval_s=0, backoff_factory=fast_backoff, on_status=lambda k, d: events.append(k)
     )
     with svc:
         deadline = time.time() + 5
@@ -137,3 +137,24 @@ def test_every_attempt_releases_source():
     with svc:
         svc.get(timeout=3)
     assert all(s.released >= 1 for s in fac.sources)
+
+
+def test_frozen_reopen_is_rate_limited():
+    opens = {"n": 0}
+
+    def factory():
+        opens["n"] += 1
+        still = syn.scene(1, 96, 128)
+
+        def gen():
+            while True:
+                yield still
+
+        return FakeFrameSource(gen, fps=300)
+
+    svc = CameraCaptureService(
+        factory, 100, 0, 8, frozen_frames=5, frozen_seconds=0, frozen_reopen_interval_s=3600, backoff_factory=fast_backoff
+    )
+    with svc:
+        time.sleep(1.5)
+    assert opens["n"] <= 2  # one reopen at most per interval

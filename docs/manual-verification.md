@@ -10,3 +10,7 @@ Automated tests never call the real `LockWorkStation`, never cover your lens and
 | M2.2 | T2.2 live | Disable camera in Device Manager during a run: `CAMERA_UNAVAILABLE` within ~2 s | PENDING |
 | M2.3 | T2.3-03 | Device Manager: disable then enable the camera while a run is active; recovery within ~35 s | PENDING |
 | M2.3 | T2.3-04..07 | Windows Camera app / Meet / Hello / privacy toggle matrix in `docs/testing.md` | PENDING |
+| M3.1 | T3.1-09 | Run `python -m silentwatch.tools.feature_probe --seconds 10` three times: normal, hand covering lens, lights off; paste the numbers into `docs/testing.md` | PENDING |
+| M3.2 | T3.2-07 | Calibrate in your normal desk lighting with the screen on: `python -m silentwatch.tools.calibrate`. (An automated run in the dim test room already succeeded with 22 frames.) | PARTIAL |
+| M3.3 | live dry-run | After calibrating, cover the lens with your hand: console/dashboard shows CONFIRMED_OBSTRUCTION with reasons; switch the room light off with the screen on: no CONFIRMED (see M4.4 for the full run) | PENDING |
+| M3.4 | T3.4-01..07 | Record real clips and evaluate: `python -m silentwatch.tools.record_clip --scenario normal --seconds 40`, then `hand_fast`, `hand_slow`, `finger`, `cloth`, `paper`, `lights_off`, `partial`, `translucent` (use `--cover-at`), then `python -m silentwatch.tools.evaluate --write-docs`. Add 30 minutes of normal use. Tune `Thresholds` in `obstruction.py` only with these results | PENDING |

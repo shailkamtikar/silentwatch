@@ -19,6 +19,8 @@ class CameraConfig:
     analysis_fps: float
     warmup_frames: int
     frozen_frames: int
+    frozen_seconds: float
+    frozen_reopen_interval_s: float
     read_fail_limit: int
     max_backoff_s: float
     queue_size: int
@@ -30,6 +32,8 @@ class CameraConfig:
         _check(0.5 <= self.analysis_fps <= 30, "camera.analysis_fps must be 0.5..30")
         _check(0 <= self.warmup_frames <= 120, "camera.warmup_frames must be 0..120")
         _check(2 <= self.frozen_frames <= 600, "camera.frozen_frames must be 2..600")
+        _check(0 <= self.frozen_seconds <= 600, "camera.frozen_seconds must be 0..600")
+        _check(0 <= self.frozen_reopen_interval_s <= 86400, "camera.frozen_reopen_interval_s invalid")
         _check(1 <= self.read_fail_limit <= 100, "camera.read_fail_limit must be 1..100")
         _check(1 <= self.max_backoff_s <= 600, "camera.max_backoff_s must be 1..600")
         _check(1 <= self.queue_size <= 256, "camera.queue_size must be 1..256")

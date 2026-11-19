@@ -42,8 +42,15 @@ def _is_shutter_black(img: np.ndarray) -> bool:
 
 
 class CameraHealthMonitor:
-    def __init__(self, frozen_frames: int = 10, read_fail_limit: int = 5, expected_interval_s: float = 0.2):
+    def __init__(
+        self,
+        frozen_frames: int = 10,
+        read_fail_limit: int = 5,
+        expected_interval_s: float = 0.2,
+        frozen_seconds: float = 20.0,
+    ):
         self.frozen_frames = frozen_frames
+        self.frozen_seconds = frozen_seconds
         self.read_fail_limit = read_fail_limit
         self.expected_interval_s = expected_interval_s
         self.state = HealthState.OK
@@ -52,6 +59,7 @@ class CameraHealthMonitor:
         self._last_hash: bytes | None = None
         self._last_shape: tuple | None = None
         self._last_ts: float | None = None
+        self._same_since: float | None = None
 
     def observe(self, ok: bool, image: np.ndarray | None, ts: float) -> list[HealthEvent]:
         """Feed one read result. Returns health events caused by it (usually empty)."""
@@ -80,9 +88,13 @@ class CameraHealthMonitor:
             self._same_run += 1
         else:
             self._same_run = 0
+            self._same_since = ts
         self._last_hash = h
 
-        if self._same_run + 1 >= self.frozen_frames:
+        # A dim, static scene can deliver bit-identical frames for seconds (observed on the HP camera, D9),
+        # so 'frozen' needs both a frame count and a minimum duration.
+        same_for = ts - (self._same_since if self._same_since is not None else ts)
+        if self._same_run + 1 >= self.frozen_frames and same_for >= self.frozen_seconds:
             if self.state != HealthState.FROZEN:
                 self.state = HealthState.FROZEN
                 events.append(HealthEvent(HealthEventKind.FROZEN, f"{self._same_run + 1} identical frames"))

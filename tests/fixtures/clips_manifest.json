@@ -1,0 +1,74 @@
+{
+  "normal_use": {
+    "description": "Normal scene for 60 s",
+    "expect_confirm": false,
+    "cover_start_s": null,
+    "known_limit": false
+  },
+  "dim_room": {
+    "description": "Dim room with screen glow",
+    "expect_confirm": false,
+    "cover_start_s": null,
+    "known_limit": false
+  },
+  "lights_off": {
+    "description": "Lights switched off, screen glow remains",
+    "expect_confirm": false,
+    "cover_start_s": null,
+    "known_limit": false
+  },
+  "brightness_swing": {
+    "description": "Screen/sun brightness oscillating",
+    "expect_confirm": false,
+    "cover_start_s": null,
+    "known_limit": false
+  },
+  "hand_fast": {
+    "description": "Hand covers lens quickly",
+    "expect_confirm": true,
+    "cover_start_s": 4.0,
+    "known_limit": false
+  },
+  "hand_slow": {
+    "description": "Hand approaches slowly over 1.5 s",
+    "expect_confirm": true,
+    "cover_start_s": 5.5,
+    "known_limit": false
+  },
+  "finger": {
+    "description": "Finger over lens",
+    "expect_confirm": true,
+    "cover_start_s": 4.0,
+    "known_limit": false
+  },
+  "cloth": {
+    "description": "Dark cloth over lens",
+    "expect_confirm": true,
+    "cover_start_s": 4.0,
+    "known_limit": false
+  },
+  "paper": {
+    "description": "Sheet of paper over lens",
+    "expect_confirm": true,
+    "cover_start_s": 4.0,
+    "known_limit": false
+  },
+  "shutter": {
+    "description": "Privacy shutter closed (constant black)",
+    "expect_confirm": true,
+    "cover_start_s": 4.0,
+    "known_limit": false
+  },
+  "partial": {
+    "description": "Half the lens covered",
+    "expect_confirm": false,
+    "cover_start_s": 4.0,
+    "known_limit": false
+  },
+  "translucent": {
+    "description": "Translucent material (blend)",
+    "expect_confirm": false,
+    "cover_start_s": 4.0,
+    "known_limit": true
+  }
+}

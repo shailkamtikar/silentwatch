@@ -20,7 +20,7 @@ def test_healthy_stream():
 
 
 def test_frozen_after_threshold_not_before():
-    m = CameraHealthMonitor(frozen_frames=10)
+    m = CameraHealthMonitor(frozen_frames=10, frozen_seconds=0)
     f = syn.scene(1, 96, 128)
     ev = feed(m, [f] * 9)
     assert m.state == HealthState.OK and ev == []
@@ -44,7 +44,7 @@ def test_recovery_after_unavailable():
 
 
 def test_recovery_after_frozen():
-    m = CameraHealthMonitor(frozen_frames=3)
+    m = CameraHealthMonitor(frozen_frames=3, frozen_seconds=0)
     f = syn.scene(2, 96, 128)
     feed(m, [f] * 3)
     assert m.state == HealthState.FROZEN
@@ -67,13 +67,13 @@ def test_timestamp_gap_not_freeze():
 
 
 def test_shutter_black_frames_are_not_frozen():
-    m = CameraHealthMonitor(frozen_frames=5)
+    m = CameraHealthMonitor(frozen_frames=5, frozen_seconds=0)
     ev = feed(m, [syn.black(96, 128)] * 50)
     assert m.state == HealthState.OK and ev == []
 
 
 def test_no_event_spam():
-    m = CameraHealthMonitor(frozen_frames=3)
+    m = CameraHealthMonitor(frozen_frames=3, frozen_seconds=0)
     f = syn.scene(4, 96, 128)
     ev = feed(m, [f] * 40)
     assert kinds(ev).count(HealthEventKind.FROZEN) == 1
@@ -84,3 +84,13 @@ def test_isolated_failure_does_not_trip():
     frames = [syn.noise(i, h=96, w=128) for i in range(20)]
     frames[5] = None
     assert feed(m, frames) == [] and m.state == HealthState.OK
+
+
+def test_dim_static_scene_with_repeated_frames_not_frozen_before_duration():
+    # observed on the real camera (D9): >2 s of identical frames in a dim static room
+    m = CameraHealthMonitor(frozen_frames=10, frozen_seconds=20)
+    f = syn.scene(5, 96, 128)
+    ev = feed(m, [f] * 40)  # 8 s of identical frames at 5 fps
+    assert m.state == HealthState.OK and ev == []
+    ev = feed(m, [f] * 80, t0=8.0)  # up to 24 s total
+    assert m.state == HealthState.FROZEN
