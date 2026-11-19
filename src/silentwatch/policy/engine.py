@@ -49,6 +49,7 @@ class PolicyEngine:
         self._last_lock_at: float | None = None
         self._grace_until: float = 0.0
         self._locked = False
+        self._latched = False                         # a lock was requested for the condition that still holds
         self._phone_known = False
         self._phase: State | None = State.INITIALIZING  # externally forced phase (INITIALIZING/CALIBRATING/DISABLED)
 
@@ -74,6 +75,7 @@ class PolicyEngine:
             return self._refresh_state("session locked")
         if kind == K.SESSION_UNLOCKED:
             self._locked = False
+            self._latched = False
             self._levels.clear()
             self._events.clear()
             self._grace_until = now + self.cfg.post_unlock_grace_s
@@ -125,14 +127,24 @@ class PolicyEngine:
             reason = rule.check(ctx)
             if reason is None:
                 continue
+            if self._latched:
+                return []  # already requested a lock for this condition; re-armed when it clears or on unlock
             if now < self._grace_until:
                 return [Action(ActionKind.LOG, f"lock suppressed by post-unlock grace: {reason}", rule.name)]
             if self._last_lock_at is not None and now - self._last_lock_at < self.cfg.lock_cooldown_s:
                 return [Action(ActionKind.LOG, f"lock suppressed by cooldown: {reason}", rule.name)]
             self._last_lock_at = now
+            self._latched = True
             acts = [Action(ActionKind.LOCK, reason, rule.name, {"trigger": why, "mode": self.mode})]
             return acts + self._refresh_state("lock requested")
+        self._latched = False  # nothing triggers any more: re-arm
         return []
+
+    def on_lock_result(self, ok: bool) -> None:
+        """Tell the engine whether the lock request was accepted; a failed request is retried."""
+        if not ok:
+            self._latched = False
+            self._last_lock_at = None
 
     def _side_effect_actions(self, sig: Signal) -> list[Action]:
         k = sig.kind

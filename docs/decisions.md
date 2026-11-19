@@ -48,3 +48,6 @@ The playbook asked calibration to reject frozen streams. On the real camera a st
 
 ## D11. Presence via MediaPipe Face Detector (M4.2)
 `mediapipe 1.2.3` with `blaze_face_short_range.tflite` (Google model storage, 229,746 bytes, SHA-256 pinned in `scripts/download_models.ps1` and `models/README.md`; recorded on first verified download). Detection costs ~2.5 ms per frame on this laptop's CPU. A corrupted model file is detected by hash and re-downloaded (tested). A live run in the dim test room saw 0 faces in 45 frames and correctly progressed to `OWNER_ABSENT_PENDING`; detection of a real face needs a person in view (see `docs/manual-verification.md`). Presence is not identity: a photo can be detected as a face (documented limit).
+
+## D12. Lock requests are latched per condition (M4.3)
+Early scripted tests showed that, with cooldown 0, a persisting condition (e.g. absence confirmed) issued a LOCK on every frame. The engine now latches: one LOCK per continuous condition; the latch re-arms when no rule triggers any more, on SESSION_UNLOCKED, or when `on_lock_result(False)` reports that Windows rejected the request (so a failed lock is retried).
