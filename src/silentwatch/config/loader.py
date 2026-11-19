@@ -101,3 +101,41 @@ def save_overrides(overrides: dict[str, dict[str, Any]], path: Path | None = Non
     tmp.write_text(json.dumps(overrides, indent=2), encoding="utf-8")
     os.replace(tmp, target)
     return target
+
+
+def read_user_overrides(path: Path | None = None) -> dict[str, Any]:
+    return _read_overrides(path if path is not None else user_settings_path())
+
+
+def validate_change(section: str, key: str, value: Any) -> str | None:
+    """Return None if `section.key = value` is acceptable, otherwise a human-readable error."""
+    cls = SECTIONS.get(section)
+    defaults = _load_defaults()
+    if cls is None or key not in defaults[section]:
+        return f"unknown setting {section}.{key}"
+    if not _type_ok(defaults[section][key], value):
+        return f"{section}.{key}: wrong type (expected {type(defaults[section][key]).__name__})"
+    try:
+        cls(**{**defaults[section], key: value})
+    except ValueError as exc:
+        return str(exc)
+    return None
+
+
+def update_settings(
+    changes: dict[str, dict[str, Any]], path: Path | None = None
+) -> tuple[Config, dict[str, str]]:
+    """Validate and persist user changes. Invalid entries are NOT saved; returns (config, {section.key: error})."""
+    target = path if path is not None else user_settings_path()
+    current = _read_overrides(target)
+    errors: dict[str, str] = {}
+    for section, items in changes.items():
+        for key, value in items.items():
+            err = validate_change(section, key, value)
+            if err:
+                errors[f"{section}.{key}"] = err
+            else:
+                current.setdefault(section, {})[key] = value
+    if len(errors) < sum(len(v) for v in changes.values()):
+        save_overrides(current, target)
+    return load_config(target), errors

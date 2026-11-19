@@ -32,6 +32,13 @@ def run_tray(args: argparse.Namespace) -> int:
         return 0
 
     cfg = load_config()
+    from silentwatch.ui.settings import ask_consent_qt, make_settings_dialog
+    from silentwatch.ui.settings_logic import erase_everything, startup_gate
+
+    if not startup_gate(cfg, ask_consent_qt):
+        guard.release()
+        return 0          # declined: the camera is never opened
+    cfg = load_config()
     policy = dataclasses.replace(cfg.policy, dry_run=not args.live, mode=args.mode or cfg.policy.mode)
     cfg = dataclasses.replace(cfg, policy=policy)
     logging.basicConfig(level=getattr(logging, cfg.logging.level), format="%(asctime)s %(levelname)s %(message)s")
@@ -70,7 +77,20 @@ def run_tray(args: argparse.Namespace) -> int:
         guard.release()
         app.quit()
 
-    tray = TrayApp(svc, open_dashboard=open_dashboard, on_quit=quit_app)
+    def open_settings() -> None:
+        def erased() -> None:
+            erase_everything(lambda: (svc.stop(), db.close()))
+            guard.release()
+            app.quit()
+
+        def test_lock() -> None:
+            WindowsLockService(svc.store, dry_run=False, cooldown_s=0).lock("manual test lock from settings")
+
+        dlg = make_settings_dialog(load_config(), on_saved=lambda c: svc.set_mode(c.policy.mode), on_erase=erased, on_test_lock=test_lock)
+        dash["settings"] = dlg
+        dlg.show()
+
+    tray = TrayApp(svc, open_dashboard=open_dashboard, on_quit=quit_app, open_settings=open_settings)
     if not QSystemTrayIcon.isSystemTrayAvailable():
         logging.warning("no system tray available on this desktop")
     svc.start()
