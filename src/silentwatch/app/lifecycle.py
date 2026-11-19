@@ -47,6 +47,7 @@ class ServiceStatus:
     scores: dict | None = None
     seconds_since_seen: float = 0.0
     hand_score: float = 0.0
+    phone: str = "OFF"
     lock_in_s: float | None = None      # seconds until an absence lock, when absence is pending
 
 
@@ -89,6 +90,9 @@ class SilentWatchService:
         self._last_obs = "UNKNOWN"
         self.lock_actions: list[Action] = []   # every LOCK decision (for tests and diagnostics)
         self.hand = hand_backend if cfg.hand.enabled else None
+        self.proximity = None                      # optional BluetoothProximityService, set by the caller
+        self.phone_state = "OFF"
+        self._phone_q: queue.Queue = queue.Queue()
         self.hand_tracker = HandApproachTracker(cfg.hand.approach_growth)
         self.hand_invocations = 0
         self.hand_score = 0.0
@@ -111,9 +115,13 @@ class SilentWatchService:
         self.store.append(EventType.APP_STARTED, source="service", details={"mode": self.cfg.policy.mode, "dry_run": self.lock_service.dry_run})
         self._thread = threading.Thread(target=self._run, name="silentwatch-service", daemon=True)
         self._thread.start()
+        if self.proximity is not None:
+            self.proximity.start()
 
     def stop(self, timeout: float = 10.0) -> None:
         self._stop.set()
+        if self.proximity is not None:
+            self.proximity.stop()
         if self._thread is not None:
             self._thread.join(timeout)
             self._thread = None
@@ -128,7 +136,7 @@ class SilentWatchService:
         pending = tr.state.value in ("OWNER_ABSENT_PENDING", "PRESENCE_UNCERTAIN") and since > 0
         return ServiceStatus(
             self.core.state, self.classifier.state, tr.state.value, cam, self._frames, self._frames / elapsed,
-            self._paused, self.crashed, self._last_scores, since, self.hand_score, max(0.0, tr.lock_after_s - since) if pending else None,
+            self._paused, self.crashed, self._last_scores, since, self.hand_score, self.phone_state, max(0.0, tr.lock_after_s - since) if pending else None,
         )
 
     # -- controls used by the tray / dashboard -------------------------------------------------
@@ -227,6 +235,7 @@ class SilentWatchService:
                         self.calibration.clear()
                         self._calibrate_if_needed(f)
                 self._drain_camera_status()
+                self._drain_phone()
                 frame = self._capture.get(timeout=0.2) if self._capture else None
                 if frame is not None:
                     self._process(frame)
@@ -244,6 +253,19 @@ class SilentWatchService:
             if f is not None:
                 return f
         return None
+
+    def on_phone_state(self, state) -> None:
+        """Thread-safe entry for BluetoothProximityService state changes."""
+        self._phone_q.put(state)
+
+    def _drain_phone(self) -> None:
+        while True:
+            try:
+                state = self._phone_q.get_nowait()
+            except queue.Empty:
+                return
+            self.phone_state = state.value
+            self._dispatch(self.core.on_phone(state))
 
     def on_session_event(self, kind: str) -> None:
         """Thread-safe entry for SessionWatcher events: LOCK, UNLOCK, LOGOFF, SUSPEND, RESUME ..."""

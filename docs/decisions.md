@@ -60,3 +60,13 @@ Early scripted tests showed that, with cooldown 0, a persisting condition (e.g. 
 
 ## D15. Two-stage pipeline cost (M6.2)
 Live on the HP camera (idle dim room, dry-run, face + obstruction analysis at 5 fps, 20 s window after calibration): process CPU 7.0 % of one core without the hand model and 6.2 % with it enabled; 89 frames analysed in both runs and **0** hand-model invocations, because stage 1 saw no change. (The difference is measurement noise.) Stage 2 wakes on `frame_diff >= 4`, a non-NORMAL obstruction state, or for 2 s after a hand was last seen. A hand signal alone only notifies; with a possible/partial obstruction it locks before the plain debounce expires. A failing hand model disables itself and monitoring continues on stage 1.
+
+## D16. Phone proximity: feasibility spike result (M7.1, 20 Nov 2026)
+Measured on this laptop (MediaTek Bluetooth adapter) with the paired Android phone (identifiers not recorded here):
+
+| Method | Result |
+|---|---|
+| BLE advertisement scan (Bleak, 20 s, phone nearby, screen on) | 13 distinct addresses; only 2 carried a name, and neither was the phone. The phone cannot be recognised by name. Android phones use rotating random (private) addresses, so an address cannot identify it for long. One strong unnamed device (RSSI about -43 dBm, manufacturer id 224) is a candidate but is not a stable identity |
+| Paired-device connection state (WinRT `BluetoothDevice.ConnectionStatus`) | The phone is paired but reported **DISCONNECTED** while idle: Windows only shows CONNECTED while a profile (audio, Phone Link, tethering) holds a link, so a disconnect cannot be read as "phone left" |
+
+Decision: implement the proximity service behind a `ProximitySource` abstraction with smoothing, enrollment and policy rules (M7.2, M7.3), and support two sources: (1) **paired-connection** (usable only when the phone keeps a live connection, e.g. connected to the laptop for Phone Link), and (2) **BLE advertisement by service UUID**, which gives a stable identity only if the phone runs a small advertiser app (for example the free "nRF Connect" app's Advertiser with a custom service UUID). Without one of these the phone feature reports `BT_UNAVAILABLE` and has no effect on any decision: the core product does not depend on it. Windows' own Dynamic Lock (Settings > Accounts > Sign-in options) is also available for walk-away locking with the same phone.
