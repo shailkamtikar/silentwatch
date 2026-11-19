@@ -6,3 +6,5 @@ Automated tests never call the real `LockWorkStation`, never cover your lens and
 |---|---|---|---|
 | M1.3 | T1.3-05 | Save work, run `python -m silentwatch.tools.lock_test --delay 5`; real Windows lock screen must appear and PIN unlock must work | PENDING |
 | M1.3 | T1.3-06 | After unlocking, rerun with `--dry-run` and confirm `LOCK_REQUESTED`/`LOCK_RESULT` are printed | PENDING |
+| M2.2 | T2.2-07 | Point camera at a still scene for 10 minutes with the app running; no `CAMERA_FROZEN` event | PENDING |
+| M2.2 | T2.2 live | Disable camera in Device Manager during a run: `CAMERA_UNAVAILABLE` within ~2 s | PENDING |
