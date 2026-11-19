@@ -12,3 +12,4 @@ Automated tests never call the real `LockWorkStation`, never cover your lens and
 | M2.3 | T2.3-04..07 | Windows Camera app / Meet / Hello / privacy toggle matrix in `docs/testing.md` | PENDING |
 | M3.1 | T3.1-09 | Run `python -m silentwatch.tools.feature_probe --seconds 10` three times: normal, hand covering lens, lights off; paste the numbers into `docs/testing.md` | PENDING |
 | M3.2 | T3.2-07 | Calibrate in your normal desk lighting with the screen on: `python -m silentwatch.tools.calibrate`. (An automated run in the dim test room already succeeded with 22 frames.) | PARTIAL |
+| M3.3 | live dry-run | After calibrating, cover the lens with your hand: console/dashboard shows CONFIRMED_OBSTRUCTION with reasons; switch the room light off with the screen on: no CONFIRMED (see M4.4 for the full run) | PENDING |
