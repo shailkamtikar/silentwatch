@@ -57,3 +57,6 @@ Early scripted tests showed that, with cooldown 0, a persisting condition (e.g. 
 
 ## D14. Hand-approach evidence (M6.1)
 `hand_landmarker.task` (Google model storage, 7,819,105 bytes, SHA-256 pinned). On a blank 640x480 frame it costs ~8.5 ms (CPU), so it is only run when stage 1 flags a change (M6.2). The score combines relative bounding-box growth over 0.5 s with absolute size; it is monotone and clipped to 0..1. It is early-warning evidence only: policy never locks on it alone.
+
+## D15. Two-stage pipeline cost (M6.2)
+Live on the HP camera (idle dim room, dry-run, face + obstruction analysis at 5 fps, 20 s window after calibration): process CPU 7.0 % of one core without the hand model and 6.2 % with it enabled; 89 frames analysed in both runs and **0** hand-model invocations, because stage 1 saw no change. (The difference is measurement noise.) Stage 2 wakes on `frame_diff >= 4`, a non-NORMAL obstruction state, or for 2 s after a hand was last seen. A hand signal alone only notifies; with a possible/partial obstruction it locks before the plain debounce expires. A failing hand model disables itself and monitoring continues on stage 1.

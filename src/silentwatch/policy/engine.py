@@ -31,6 +31,10 @@ _EXCLUSIVE_GROUPS: list[tuple[K, ...]] = [
 ]
 
 
+# Event signals that should not linger for the generic signal_expiry_s.
+_EVENT_EXPIRY_S: dict[K, float] = {K.HAND_APPROACHING: 5.0}
+
+
 class PolicyEngine:
     def __init__(
         self,
@@ -108,7 +112,7 @@ class PolicyEngine:
         """Call periodically: expires event signals and re-evaluates (e.g. when grace ends)."""
         now = self._clock()
         for k, t in list(self._events.items()):
-            if now - t > self.cfg.signal_expiry_s:
+            if now - t > _EVENT_EXPIRY_S.get(k, self.cfg.signal_expiry_s):
                 del self._events[k]
         actions = self._refresh_state("tick")
         if not self._locked:
@@ -152,6 +156,8 @@ class PolicyEngine:
             return [Action(ActionKind.NOTIFY, "camera feed frozen; retrying (not treated as tampering)", "camera_frozen")]
         if k == K.CAMERA_UNAVAILABLE and K.OWNER_PRESENT in self._levels:
             return [Action(ActionKind.NOTIFY, "camera unavailable while you are present", "camera_unavailable_present")]
+        if k == K.HAND_APPROACHING:
+            return [Action(ActionKind.NOTIFY, "hand approaching the camera (early warning only)", "hand_alone")]
         if k == K.LOW_BRIGHTNESS:
             return [Action(ActionKind.LOG, "low brightness alone never locks", "low_brightness")]
         if k == K.PHONE_MISSING:

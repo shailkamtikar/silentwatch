@@ -54,6 +54,7 @@ class DecisionCore:
         self._last_presence_signal: K | None = None
         self._last_obstruction_signal: K | None = None
         self.camera_ok = True
+        self._hand_signalled = False
 
     def start_monitoring(self) -> list[Action]:
         return self.engine.set_phase(None)
@@ -83,6 +84,16 @@ class DecisionCore:
             return []
         self._last_obstruction_signal = sig
         return self.engine.handle(Signal(sig, detail={"reasons": result.reasons, "scores": result.scores}))
+
+    def on_hand(self, approaching: bool, score: float = 0.0) -> list[Action]:
+        """Hand evidence. Only the transition into 'approaching' is forwarded (signals are not repeated per frame)."""
+        if not approaching:
+            self._hand_signalled = False
+            return []
+        if self._hand_signalled:
+            return []
+        self._hand_signalled = True
+        return self.engine.handle(Signal(K.HAND_APPROACHING, confidence=score))
 
     def on_camera_status(self, kind: str, detail: str = "", ts: float | None = None) -> list[Action]:
         sig = _CAMERA_SIGNAL.get(kind)

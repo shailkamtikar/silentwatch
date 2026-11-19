@@ -61,6 +61,12 @@ def _possible_and_absent_strict(c: Context) -> str | None:
     return None
 
 
+def _hand_and_obstruction(c: Context) -> str | None:
+    if c.has(K.HAND_APPROACHING) and c.has(K.OBSTRUCTION_POSSIBLE, K.OBSTRUCTION_PARTIAL):
+        return "hand approaching the lens with a possible obstruction"
+    return None
+
+
 def _camera_unavailable_and_absent(c: Context) -> str | None:
     if not c.has(K.CAMERA_UNAVAILABLE):
         return None
@@ -81,6 +87,7 @@ RULES: list[Rule] = [
     Rule("obstruction_confirmed", _obstruction_confirmed),
     Rule("partial_and_absent", _partial_and_absent),
     Rule("possible_and_absent_strict", _possible_and_absent_strict),
+    Rule("hand_and_obstruction", _hand_and_obstruction),
     Rule("camera_unavailable_and_absent", _camera_unavailable_and_absent),
     Rule("owner_absent_confirmed", _owner_absent_confirmed),
 ]
