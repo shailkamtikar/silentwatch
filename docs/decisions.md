@@ -51,3 +51,6 @@ The playbook asked calibration to reject frozen streams. On the real camera a st
 
 ## D12. Lock requests are latched per condition (M4.3)
 Early scripted tests showed that, with cooldown 0, a persisting condition (e.g. absence confirmed) issued a LOCK on every frame. The engine now latches: one LOCK per continuous condition; the latch re-arms when no rule triggers any more, on SESSION_UNLOCKED, or when `on_lock_result(False)` reports that Windows rejected the request (so a failed lock is retried).
+
+## D13. Live end-to-end dry run (M4.4)
+`python -m silentwatch --headless --seconds 30` on the HP camera (dry-run, temporary data dir): started, calibrated automatically (MISSING -> 6 frames wait -> baseline), then with nobody in view went `OWNER_ABSENT_PENDING` at ~9 s after start and issued a dry-run lock for "owner absent beyond configured timeout" at ~19 s after start, i.e. 10 s after the last (non-)detection as configured. A static dim scene produced a FROZEN warning after ~18 s of identical frames and one device re-open; defaults were raised to `frozen_seconds = 60` and `frozen_reopen_interval_s = 600` to make that rarer. All 8 scripted end-to-end scenarios (A, C, D, E, F, post-unlock, clean exit, audit trail) pass with fake camera/face/lock.
