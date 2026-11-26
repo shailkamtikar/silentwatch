@@ -7,6 +7,7 @@ import json
 import logging
 import sqlite3
 import threading
+import time
 from collections import deque
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
@@ -76,12 +77,78 @@ def _now_iso() -> str:
 
 
 class EventStore:
-    """Append-only event log. Storage failures never raise out of append()."""
+    """Append-only event log. Storage failures never raise out of append().
 
-    def __init__(self, db: Database, fallback_size: int = 1000):
+    With async_writes=True, append() only queues the event in memory and a background thread writes it, so a slow,
+    locked or full database can never stall the monitoring/decision path (it retries until the database recovers).
+    """
+
+    def __init__(self, db: Database, fallback_size: int = 1000, async_writes: bool = False):
         self.db = db
         self._pending: deque[Event] = deque(maxlen=fallback_size)
         self._flush_lock = threading.Lock()
+        self._async = async_writes
+        self._cv = threading.Condition()
+        self._closing = False
+        self._writer: threading.Thread | None = None
+        if async_writes:
+            self._writer = threading.Thread(target=self._writer_loop, name="event-writer", daemon=True)
+            self._writer.start()
+
+    # -- async writer ---------------------------------------------------------------------
+    def _flush_async(self) -> bool:
+        """Write queued events one by one. Returns False if the database refused (events stay queued)."""
+        while True:
+            with self._cv:
+                if not self._pending:
+                    return True
+                ev = self._pending.popleft()
+            try:
+                self._insert(ev)
+            except sqlite3.Error as exc:
+                with self._cv:
+                    self._pending.appendleft(ev)
+                log.error("Event store write failed (%r); %d event(s) held in memory", exc, len(self._pending))
+                return False
+
+    def _writer_loop(self) -> None:
+        while True:
+            with self._cv:
+                while not self._pending and not self._closing:
+                    self._cv.wait(0.5)
+                if self._closing and not self._pending:
+                    return
+            if not self._flush_async():
+                time.sleep(0.3)          # database busy/full: retry shortly
+                with self._cv:
+                    if self._closing:
+                        return
+
+    def flush(self, timeout: float = 2.0) -> bool:
+        """Wait (bounded) until everything queued has been written. True if the queue drained."""
+        if not self._async:
+            with self._flush_lock:
+                self._flush()
+            return not self._pending
+        end = time.monotonic() + timeout
+        while time.monotonic() < end:
+            with self._cv:
+                if not self._pending:
+                    return True
+                self._cv.notify()
+            time.sleep(0.01)
+        return not self._pending
+
+    def close(self, timeout: float = 3.0) -> None:
+        """Flush (bounded), stop the writer. Later appends fall back to synchronous writes."""
+        if self._async:
+            self.flush(timeout)
+            with self._cv:
+                self._closing = True
+                self._cv.notify_all()
+            if self._writer is not None:
+                self._writer.join(timeout)
+            self._async = False
 
     def append(
         self,
@@ -94,6 +161,11 @@ class EventStore:
         timestamp_utc: str | None = None,
     ) -> None:
         ev = Event(event_type, severity, source, confidence, details, action_taken, timestamp_utc or _now_iso())
+        if self._async:
+            with self._cv:
+                self._pending.append(ev)
+                self._cv.notify()
+            return
         with self._flush_lock:
             self._pending.append(ev)
             self._flush()
@@ -143,6 +215,7 @@ class EventStore:
     _COLS = "id, timestamp_utc, event_type, severity, confidence, source, details_json, action_taken"
 
     def recent(self, n: int = 50) -> list[Event]:
+        self._settle()
         rows = self.db.query(f"SELECT {self._COLS} FROM events ORDER BY id DESC LIMIT ?", (n,))
         return [self._row(r) for r in rows]
 
@@ -153,6 +226,7 @@ class EventStore:
         limit: int = 500,
         offset: int = 0,
     ) -> list[Event]:
+        self._settle()
         clauses, params = [], []
         if event_type is not None:
             clauses.append("event_type = ?")
@@ -167,7 +241,12 @@ class EventStore:
         )
         return [self._row(r) for r in rows]
 
+    def _settle(self) -> None:
+        if self._async:
+            self.flush(1.0)
+
     def count(self) -> int:
+        self._settle()
         return self.db.query("SELECT COUNT(*) FROM events")[0][0]
 
     def purge_older_than(self, days: int) -> int:

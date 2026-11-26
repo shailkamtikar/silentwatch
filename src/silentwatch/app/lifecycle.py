@@ -67,7 +67,7 @@ class SilentWatchService:
     ):
         self.cfg = cfg
         self.db = db
-        self.store = EventStore(db)
+        self.store = EventStore(db, async_writes=True)   # decisions never wait for the database
         self.calibration = CalibrationStore(db)
         self.lock_service = lock_service
         self.clock = clock
@@ -90,6 +90,8 @@ class SilentWatchService:
         self._last_obs = "UNKNOWN"
         self.lock_actions: list[Action] = []   # every LOCK decision (for tests and diagnostics)
         self.hand = hand_backend if cfg.hand.enabled else None
+        self._iteration_failures = 0
+        self._cal_retry_at = 0.0
         self.evidence = None                       # optional EvidenceStore (snapshots are opt-in)
         self._last_normal = None
         self.usb = None                            # optional UsbMonitor, set by the caller
@@ -135,6 +137,7 @@ class SilentWatchService:
             self._thread = None
         self._release_camera()
         self.store.append(EventType.APP_STOPPED, source="service")
+        self.store.close()
 
     def status(self) -> ServiceStatus:
         cam = self._capture.state.value if self._capture else "STOPPED"
@@ -195,10 +198,19 @@ class SilentWatchService:
 
     def _calibrate_if_needed(self, first: Frame) -> None:
         res = f"{first.width}x{first.height}"
-        status = self.calibration.status(self._camera_id, res, self.cfg.obstruction.calibration_stale_days)
-        if status == CalibrationStatus.OK:
-            self.classifier.set_baseline(self.calibration.load(self._camera_id, res))
-            return
+        try:
+            status = self.calibration.status(self._camera_id, res, self.cfg.obstruction.calibration_stale_days)
+            if status == CalibrationStatus.OK:
+                self.classifier.set_baseline(self.calibration.load(self._camera_id, res))
+                return
+        except Exception as exc:  # noqa: BLE001 - a corrupted calibration row must not kill monitoring
+            log.error("stored calibration unusable (%r); recalibrating", exc)
+            self.store.append(EventType.ERROR, Severity.WARNING, "calibration", details={"detail": "stored calibration unusable; recalibrating"})
+            try:
+                self.calibration.clear()
+            except Exception:  # noqa: BLE001
+                pass
+            status = CalibrationStatus.MISSING
         self.core.engine.set_phase(State.CALIBRATING)
         self._say(f"calibrating ({status.value}); keep the lens uncovered")
         cap = self._capture
@@ -236,19 +248,32 @@ class SilentWatchService:
                     continue
                 if self._capture is None:
                     self._resume_capture()
+                if self.classifier.baseline is None and self._capture is not None and self.clock() >= self._cal_retry_at:
+                    self._cal_retry_at = self.clock() + self.CAL_RETRY_S
+                    f = self._wait_first_frame(5.0)
+                    if f is not None:
+                        self._calibrate_if_needed(f)
                 if self._recalibrate and self._capture is not None:
                     self._recalibrate = False
                     f = self._wait_first_frame(10.0)
                     if f is not None:
                         self.calibration.clear()
                         self._calibrate_if_needed(f)
-                self._drain_camera_status()
-                self._drain_phone()
-                self._drain_usb()
-                frame = self._capture.get(timeout=0.2) if self._capture else None
-                if frame is not None:
-                    self._process(frame)
-                self._dispatch(self.core.tick())
+                try:
+                    self._drain_camera_status()
+                    self._drain_phone()
+                    self._drain_usb()
+                    frame = self._capture.get(timeout=0.2) if self._capture else None
+                    if frame is not None:
+                        self._process(frame)
+                    self._dispatch(self.core.tick())
+                    self._iteration_failures = 0
+                except Exception:  # noqa: BLE001 - one bad iteration must not stop monitoring
+                    self._iteration_failures += 1
+                    log.exception("service iteration failed (%d in a row)", self._iteration_failures)
+                    if self._iteration_failures >= self.MAX_ITERATION_FAILURES:
+                        raise
+                    self._stop.wait(0.05)
         except Exception:  # noqa: BLE001 - the loop must not die silently
             log.exception("service loop crashed")
             self.crashed = True
@@ -375,6 +400,8 @@ class SilentWatchService:
         except Exception:  # noqa: BLE001 - optional evidence must never break monitoring
             log.exception("evidence capture failed")
 
+    MAX_ITERATION_FAILURES = 20
+    CAL_RETRY_S = 30.0         # retry a rejected/failed calibration; without a baseline obstruction detection is off
     STAGE2_FRAME_DIFF = 4.0   # mean gray change that wakes the (more expensive) hand model
 
     def _stage2(self, frame: Frame, feats, result) -> None:
